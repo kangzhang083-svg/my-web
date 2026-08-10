@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金融部门票据贴现利率看板 | 上海明智国际</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Microsoft YaHei', 'PingFang SC', 'sans-serif'],
+        number: ['Calibri', 'Segoe UI', 'sans-serif']
+      },
+      colors: {
+        'finance-navy': '#1a2a4a',
+        'finance-blue': '#2c4a7c',
+        'finance-light': '#f5f6f8',
+        'finance-border': '#e2e6ed',
+        'finance-green': '#16a34a',
+        'finance-red': '#dc2626',
+        'finance-gray': '#9ca3af',
+        'finance-orange': '#ea580c'
+      }
+    }
+  }
+}
+</script>
+<style>
+* { box-sizing: border-box; }
+body { background: #f0f2f5; font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; color: #1f2937; margin: 0; padding: 0; min-height: 100vh; }
+.font-number { font-family: 'Calibri', 'Segoe UI', sans-serif; font-variant-numeric: tabular-nums; }
+.card { background: #fff; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 16px; margin-bottom: 12px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.calendar-cell { padding: 6px 2px; font-size: 13px; cursor: pointer; border-radius: 4px; transition: background 0.15s; user-select: none; position: relative; }
+.calendar-cell:hover:not(.disabled):not(.other-month) { background: #e8edf5; }
+.calendar-cell.other-month { color: #cbd5e1; cursor: default; pointer-events: none; }
+.calendar-cell.disabled { color: #cbd5e1; cursor: default; pointer-events: none; }
+.calendar-cell.in-range { background: #dbeafe; border-radius: 0; }
+.calendar-cell.range-start, .calendar-cell.range-end { background: #1e3a5f !important; color: #fff !important; border-radius: 50% !important; font-weight: 700; }
+.calendar-header { font-size: 12px; color: #6b7280; padding: 4px 0; font-weight: 600; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th { background: #f8f9fb; color: #4b5563; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; white-space: nowrap; cursor: pointer; user-select: none; }
+.data-table th:hover { color: #1e3a5f; }
+.data-table th .sort-icon { margin-left: 4px; font-size: 10px; color: #9ca3af; }
+.data-table th.sorted .sort-icon { color: #1e3a5f; }
+.data-table td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+.data-table tr:hover td { background: #f8fafd; }
+.data-table .rate-low { color: #16a34a; font-weight: 600; }
+.data-table .rate-mid { color: #1f2937; }
+.data-table .rate-high { color: #dc2626; font-weight: 600; }
+.data-table .rate-abnormal { color: #7f1d1d; font-weight: 700; }
+.data-table .rate-none { color: #9ca3af; font-style: italic; }
+.data-table .quota-high { background: #fef3c7; font-weight: 600; }
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 7px 16px; font-size: 13px; font-weight: 500; border-radius: 4px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+.btn-primary { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+.btn-primary:hover { background: #2c5282; }
+.btn-outline { background: #fff; color: #374151; border-color: #d1d5db; }
+.btn-outline:hover { background: #f9fafb; border-color: #9ca3af; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.form-input { padding: 6px 10px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 4px; outline: none; font-family: inherit; transition: border-color 0.15s; width: 100%; }
+.form-input:focus { border-color: #1e3a5f; box-shadow: 0 0 0 2px rgba(30,58,95,0.1); }
+.form-select { padding: 6px 10px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 4px; outline: none; background: #fff; font-family: inherit; cursor: pointer; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+@media (max-width: 1024px) { .layout-row-2 { flex-direction: column !important; } .layout-row-2 > div:first-child { width: 100% !important; min-width: 0 !important; } .layout-row-2 > div:last-child { width: 100% !important; } .charts-row-1 { flex-direction: column !important; } .kpi-row { flex-wrap: wrap; } .kpi-card { width: calc(50% - 6px) !important; } }
+@media (max-width: 640px) { .kpi-card { width: 100% !important; } .calendar-wrap { flex-direction: column !important; } .filter-row { flex-direction: column !important; } }
+.cal-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; color: #374151; transition: all 0.15s; }
+.cal-nav-btn:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+.cal-nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.cal-title { font-size: 14px; font-weight: 600; color: #1f2937; min-width: 130px; text-align: center; }
+
+/* 日历单元格完整可点击区域 */
+.calendar-cell { display: flex; align-items: center; justify-content: center; min-height: 28px; width: 100%; cursor: pointer; }
+.calendar-cell.other-month { pointer-events: none; cursor: default; }
+.calendar-cell.disabled { pointer-events: none; cursor: default; opacity: 0.4; }
+/* 统一导航栏响应式 */
+.cal-nav-row { flex-wrap: nowrap; }
+@media (max-width: 640px) {
+  .cal-nav-row { flex-wrap: wrap; justify-content: center; gap: 4px; }
+}
+
+
+/* 快捷日期按钮 */
+.btn-quick {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 8px; font-size: 11px; font-weight: 400;
+  border-radius: 3px; border: 1px solid #d1d5db;
+  background: #fafbfc; color: #4b5563;
+  cursor: pointer; transition: all 0.15s;
+  font-family: inherit; white-space: nowrap;
+}
+.btn-quick:hover { background: #e5e7eb; border-color: #9ca3af; color: #1f2937; }
+.btn-quick:active { background: #d1d5db; }
+/* 快捷按钮激活高亮 */
+.btn-quick.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; font-weight: 600; }
+/* 重置日期按钮 */
+.btn-reset { display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; font-size: 12px; font-weight: 500; border-radius: 4px; border: 1px solid #1e3a5f; background: #fff; color: #1e3a5f; cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+.btn-reset:hover { background: #e8edf5; }
+
+</style>
+</head>
+<body>
+<div id="app" class="max-w-[1600px] mx-auto px-3 py-3">
+  
+
+<!-- 页头 -->
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <h1 class="text-xl font-bold text-finance-navy m-0">金融部门票据贴现利率看板</h1>
+      <p class="text-xs text-gray-500 m-0 mt-0.5">Bank Acceptance Draft Discount Rate Dashboard</p>
+    </div>
+    <div class="text-xs text-gray-400" id="headerTime">--</div>
+  </div>
+
+  
+
+
+
+<!-- 二、核心指标总览区 -->
+  <div class="flex gap-3 kpi-row" id="kpiRow">
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">最低贴现利率</div><div class="text-2xl font-bold font-number text-finance-green" id="kpiMinRate">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">最高贴现利率</div><div class="text-2xl font-bold font-number text-finance-red" id="kpiMaxRate">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">平均贴现利率</div><div class="text-2xl font-bold font-number text-finance-navy" id="kpiAvgRate">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">报价银行总数</div><div class="text-2xl font-bold font-number text-finance-navy" id="kpiBankCount">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">可用额度银行数</div><div class="text-2xl font-bold font-number text-finance-blue" id="kpiAvailBank">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">暂未报价</div><div class="text-2xl font-bold font-number text-finance-gray" id="kpiNotQuoted">--</div></div>
+    <div class="card flex-1 min-w-[130px] kpi-card"><div class="text-xs text-gray-400 mb-1">数据更新时间</div><div class="text-sm font-semibold text-finance-navy" id="kpiUpdateTime">--</div></div>
+  </div>
+
+  
+
+  
+
+  <!-- 第二行：左日历(32%) + 右筛选表格(66%) -->
+  <div class="flex gap-3 layout-row-2" style="align-items:flex-start;">
+    <div style="width:32%; min-width:280px; flex-shrink:0;">
+<!-- 一、双月日期选择器 -->
+  <div class="card" id="datePickerCard">
+    <!-- 标题行 -->
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-semibold text-finance-navy">日期区间选择</span>
+      <span class="text-xs text-gray-400" id="dateStatus">请选择起止日期</span>
+    </div>
+
+    <!-- 统一导航栏：<< < 在左，> 在月标题之间，>> 在右 -->
+    <div class="flex items-center justify-between mb-2 cal-nav-row">
+      <div class="flex items-center gap-2">
+        <button class="cal-nav-btn" id="btnPrevYear" title="上一年">&laquo;</button>
+        <button class="cal-nav-btn" id="btnPrevMonth" title="上一月">&lsaquo;</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="cal-title" id="leftTitle">2026年8月</span>
+        <button class="cal-nav-btn" id="btnNextMonth" title="下一月">&rsaquo;</button>
+        <span class="cal-title" id="rightTitle">2026年9月</span>
+      </div>
+      <button class="cal-nav-btn" id="btnNextYear" title="下一年">&raquo;</button>
+    </div>
+
+    <!-- 双月日历网格 -->
+    <div class="flex gap-3 calendar-wrap" id="calendarContainer">
+      <div class="flex-1 min-w-0">
+        <div class="calendar-grid" id="leftWeekHeaders"></div>
+        <div class="calendar-grid" id="leftCalendar"></div>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="calendar-grid" id="rightWeekHeaders"></div>
+        <div class="calendar-grid" id="rightCalendar"></div>
+      </div>
+    </div>
+
+        <!-- 快捷日期按钮栏 -->
+    <div class="flex items-center gap-1.5 flex-wrap mt-2 pt-2 border-t border-gray-100" id="quickDateBar">
+      <span class="text-xs text-gray-400 mr-1">快捷：</span>
+      <button class="btn-quick" data-quick="today">今日</button>
+      <button class="btn-quick" data-quick="3d">近3天</button>
+      <button class="btn-quick" data-quick="7d">近7天</button>
+      <button class="btn-quick" data-quick="30d">近30天</button>
+      <button class="btn-quick" data-quick="thisMonth">本月</button>
+      <button class="btn-quick" data-quick="lastMonth">上个月</button>
+      <button class="btn-quick" data-quick="thisQuarter">本季度</button>
+      <button class="btn-quick" data-quick="lastQuarter">上季度</button>
+      <button class="btn-quick" data-quick="thisYear">本年</button>
+      <button class="btn-quick" data-quick="lastYear">上一年</button>
+    </div>
+
+    <!-- 底部状态与按钮 -->
+    <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+      <span class="text-xs text-gray-500" id="rangeHint">点击日期选择起止区间，灰色日期不可选</span>
+      <div class="flex items-center gap-2">
+        <button class="btn-reset" id="btnResetDate">重置日期</button>
+        <button class="btn btn-primary btn-sm" id="btnConfirmDate">确定 & 刷新数据</button>
+      </div>
+    </div>
+  </div>
+    </div>
+    <div style="width:66%; min-width:0; flex:1 1 auto;">
+<!-- 三、筛选面板 -->
+  <div class="card">
+    <div class="flex items-center gap-3 flex-wrap filter-row">
+      <div class="flex items-center gap-1.5"><label class="text-xs text-gray-500 whitespace-nowrap">地区</label><select class="form-select text-xs" id="filterRegion"><option value="">全部地区</option></select></div>
+      <div class="flex items-center gap-1.5"><label class="text-xs text-gray-500 whitespace-nowrap">利率范围</label><input class="form-input w-20 text-xs" id="filterRateMin" type="number" step="0.01" placeholder="最低"><span class="text-xs text-gray-400">-</span><input class="form-input w-20 text-xs" id="filterRateMax" type="number" step="0.01" placeholder="最高"></div>
+      <div class="flex items-center gap-1.5"><label class="text-xs text-gray-500 whitespace-nowrap">最低额度(万)</label><input class="form-input w-24 text-xs" id="filterQuotaMin" type="number" placeholder="额度下限"></div>
+      <div class="flex items-center gap-1.5 flex-1 min-w-[160px]"><label class="text-xs text-gray-500 whitespace-nowrap">银行搜索</label><input class="form-input text-xs flex-1" id="filterBankSearch" type="text" placeholder="输入银行名称关键词"></div>
+      <button class="btn btn-outline btn-sm" id="btnResetFilter">重置筛选</button>
+    </div>
+  </div>
+<div class="card flex-1 min-w-0" style="overflow-x:auto; max-height:620px; overflow-y:auto;">
+      <div class="flex items-center justify-between mb-2"><span class="text-sm font-semibold text-finance-navy">报价明细</span><span class="text-xs text-gray-400" id="tableCount">共 0 条</span></div>
+      <table class="data-table" id="dataTable">
+        <thead><tr><th data-sort="time">报价时间 <span class="sort-icon">&#9660;</span></th><th data-sort="region">地区 <span class="sort-icon">&#9660;</span></th><th data-sort="bank">银行 <span class="sort-icon">&#9660;</span></th><th data-sort="rate" style="text-align:right">国股贴现利率(%) <span class="sort-icon">&#9660;</span></th><th data-sort="quota" style="text-align:right">剩余额度(万) <span class="sort-icon">&#9660;</span></th><th>备注</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    
+    </div>
+  </div>
+
+    </div>
+  </div>
+
+<!-- 第三行：图表区域 -->
+  <!-- 第一行：银行利率TOP20 + 利率区间分布 左右并排 -->
+  <div class="flex gap-3 charts-row-1" style="flex-wrap:wrap;">
+    <div class="flex-1" style="min-width:380px;">
+      <div class="card" style="padding:18px;">
+        <span class="text-sm font-semibold text-finance-navy block mb-2">银行利率排名 TOP20（低&#8594;高）</span>
+        <div id="chart3" style="width:100%;height:370px;"></div>
+      </div>
+    </div>
+    <div class="flex-1" style="min-width:380px;">
+      <div class="card" style="padding:18px;">
+        <span class="text-sm font-semibold text-finance-navy block mb-2">利率区间分布</span>
+        <div id="chart1" style="width:100%;height:370px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第二行：各地区平均利率对比 通栏放大 -->
+  <div class="charts-row-2 mt-3">
+    <div class="card" style="padding:18px;">
+      <span class="text-sm font-semibold text-finance-navy block mb-2">各地区平均利率对比</span>
+      <div id="chart2" style="width:100%;height:420px;"></div>
+    </div>
+  </div>
+
+
+
+<!-- 五、底部功能栏 -->
+  <div class="card flex items-center justify-between flex-wrap gap-3 mt-3">
+    <div class="flex items-center gap-3">
+      <label class="btn btn-outline cursor-pointer"><input type="file" id="fileInput" accept=".xls,.xlsx" class="hidden">上传Excel报价文件</label>
+      <button class="btn btn-primary" id="btnExport">导出筛选结果Excel</button>
+      <button class="btn btn-primary" id="btnDownloadHtml" style="background:#059669">下载更新后看板</button>
+      <button class="btn btn-outline btn-sm" id="btnClearCache" style="color:#9ca3af;border-color:#e5e7eb;font-size:11px;margin-left:4px">清除缓存</button>
+    </div>
+    <div class="text-xs text-gray-400" id="footerTime">数据更新：--</div>
+  </div>
+</div>
+
+
+
+<!-- ========== 嵌入数据集 ========== -->
+<script src="data.js"></script>
+
+<!-- ==================== 主应用逻辑 ==================== -->
+<script>
+(function() {
+  'use strict';
+
+  // ========== 工具函数 ==========
+  function fmtRate(v) { if (v === null || v === undefined) return '-'; return Number(v).toFixed(2); }
+  function fmtQuota(v, qtype) {
+    if (qtype === 'zero') return '无额度';
+    if (qtype === 'offline') return '线下';
+    if (qtype === 'text') return String(v || '');
+    if (v === null || v === undefined) return '-';
+    if (v === 0) return '-';
+    if (v >= 10000) return (v / 10000).toFixed(2) + '亿';
+    return v.toFixed(0);
+  }
+  function fmtDate(d) {
+    return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+  }
+  function parseDate(s) {
+    var parts = String(s).split('.');
+    return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  }
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  // ========== 全局状态 ==========
+  var allRecords = [];
+  var filteredRecords = [];
+  var selectedStartDate = null;
+  var selectedEndDate = null;
+  var sortField = null;
+  var sortDir = 'asc';
+
+  // ========== 数据加载 ==========
+  function makeDisplayTime(dateStr, idx) {
+    var parts = String(dateStr).split('.');
+    var y = parts[0], m = String(parts[1]).padStart(2, '0'), d = String(parts[2]).padStart(2, '0');
+    return y + '-' + m + '-' + d + ' 中午';
+  }
+
+  // 将当前数据保存到 localStorage
+  function saveDataToLocalStorage() {
+    try {
+      var compact = allRecords.map(function(r) {
+        return [r.date, r.region, r.bank, r.rate, r.quota, r.quotaType || '', r.remark || '', r.rateText || ''];
+      });
+      localStorage.setItem('bill_rate_data_v2', JSON.stringify(compact));
+      console.log('已缓存 ' + compact.length + ' 条记录到本地');
+    } catch(e) { console.log('本地缓存失败（可能数据量过大）:', e.message); }
+  }
+
+  // 清除本地缓存，恢复使用内置数据
+  function clearLocalData() {
+    try { localStorage.removeItem('bill_rate_data_v2'); } catch(e) {}
+    location.reload();
+  }
+
+  function loadEmbeddedData() {
+    // 优先从 localStorage 加载更新过的数据
+    var saved = null;
+    try { saved = localStorage.getItem('bill_rate_data_v2'); } catch(e) {}
+    if (saved) {
+      try {
+        var parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          allRecords = parsed.map(function(r, i) {
+            return { date: r[0], region: r[1], bank: r[2], rate: r[3], quota: r[4], quotaType: r[5] || '', remark: r[6] || '', rateText: r[7] || '', time: makeDisplayTime(r[0], i) };
+          });
+          console.log('从本地缓存加载了 ' + allRecords.length + ' 条记录');
+          if (allRecords.length > 0) {
+            var lastDate = allRecords[allRecords.length - 1].date;
+            selectedStartDate = parseDate(lastDate);
+            selectedEndDate = parseDate(lastDate);
+          }
+          return;
+        }
+      } catch(e) { console.log('本地缓存解析失败，使用内置数据'); }
+    }
+    allRecords = EMBEDDED_DATA.map(function(r, i) {
+      return { date: r[0], region: r[1], bank: r[2], rate: r[3], quota: r[4], quotaType: r[5] || '', remark: r[6] || '', rateText: r[7] || '', time: makeDisplayTime(r[0], i) };
+    });
+    if (allRecords.length > 0) {
+      var lastDate = allRecords[allRecords.length - 1].date;
+      selectedStartDate = parseDate(lastDate);
+      selectedEndDate = parseDate(lastDate);
+    }
+  }
+
+  // ========== Excel上传解析 ==========
+  function parseUploadedData(rows) {
+    var records = [], currentDate = null, currentRegion = null;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var first = String(row[0] || '').trim();
+      if (/^\d{4}\.\d{1,2}\.\d{1,2}$/.test(first)) { currentDate = first; currentRegion = null; continue; }
+      if (first === '地区') continue;
+      var region = first || currentRegion;
+      if (first) currentRegion = first;
+      var bank = String(row[1] || '').trim();
+      if (!bank) continue;
+      var rateRaw = String(row[2] || '').trim();
+      var rate = null, rateText = '';
+      var notQuotedList = ['暂未报价','价格未报','今日贴现价格优惠暂停','价格未出','价格没报','国股','月底不做','月底不做贴现','未报','没报','贴现暂停','逐笔确认'];
+      if (rateRaw) {
+        if (notQuotedList.indexOf(rateRaw) !== -1) { rateText = rateRaw; }
+        else { var fixed = rateRaw.replace(/(d) (d)/g, '$1.$2'); var n = parseFloat(fixed); if (!isNaN(n) && n < 100) rate = n; else rateText = rateRaw; }
+      }
+      var quotaRaw = String(row[3] || '').trim();
+      var quota = null, quotaType = '';
+      if (quotaRaw === '无额度') { quota = 0; quotaType = 'zero'; }
+      else if (quotaRaw === '线下') { quota = null; quotaType = 'offline'; }
+      else if (quotaRaw) {
+        var yi = quotaRaw.match(/^([\d.]+)亿$/);
+        if (yi) { quota = parseFloat(yi[1]) * 10000; }
+        else {
+          var w = quotaRaw.match(/^([\d.]+)[Ww]$/);
+          if (w) { quota = parseFloat(w[1]); }
+          else { var n2 = parseFloat(quotaRaw.replace(/[，,]/g, '')); if (!isNaN(n2)) quota = n2; else { quotaType = 'text'; quota = quotaRaw; } }
+        }
+      }
+      var recordIdx = records.length;
+      records.push({ date: currentDate, region: region, bank: bank, rate: rate, quota: typeof quota === 'number' ? quota : null, quotaType: quotaType, remark: String(row[4] || '').trim(), rateText: rateText, time: makeDisplayTime(currentDate, recordIdx) });
+    }
+    return records;
+  }
+
+  // ========== 日期筛选 ==========
+  function getDateFilteredRecords() {
+    if (!selectedStartDate && !selectedEndDate) return allRecords;
+    var start = selectedStartDate;
+    var end = selectedEndDate || selectedStartDate;
+    return allRecords.filter(function(r) { var d = parseDate(r.date); return d >= start && d <= end; });
+  }
+
+  // ========== 多条件筛选 ==========
+  function applyFilters(records) {
+    var region = document.getElementById('filterRegion').value;
+    var rateMin = parseFloat(document.getElementById('filterRateMin').value);
+    var rateMax = parseFloat(document.getElementById('filterRateMax').value);
+    var quotaMin = parseFloat(document.getElementById('filterQuotaMin').value);
+    var bankSearch = document.getElementById('filterBankSearch').value.trim().toLowerCase();
+    return records.filter(function(r) {
+      if (region && r.region !== region) return false;
+      if (!isNaN(rateMin) && (r.rate === null || r.rate < rateMin)) return false;
+      if (!isNaN(rateMax) && (r.rate === null || r.rate > rateMax)) return false;
+      if (!isNaN(quotaMin) && (r.quota === null || r.quota < quotaMin)) return false;
+      if (bankSearch && r.bank.toLowerCase().indexOf(bankSearch) === -1) return false;
+      return true;
+    });
+  }
+
+  // ========== 排序 ==========
+  function applySort(records) {
+    if (!sortField) return records;
+    return records.slice().sort(function(a, b) {
+      var va = a[sortField], vb = b[sortField];
+      if (va === null || va === undefined) va = sortField === 'rate' ? Infinity : sortField === 'time' ? '9' : -Infinity;
+      if (vb === null || vb === undefined) vb = sortField === 'rate' ? Infinity : sortField === 'time' ? '9' : -Infinity;
+      if (sortDir === 'asc') return va > vb ? 1 : va < vb ? -1 : 0;
+      return va < vb ? 1 : va > vb ? -1 : 0;
+    });
+  }
+
+  // ========== 主更新流程 ==========
+  function updateAll() {
+    var dateFiltered = getDateFilteredRecords();
+    filteredRecords = applyFilters(dateFiltered);
+    filteredRecords = applySort(filteredRecords);
+    updateKPIs(filteredRecords, dateFiltered);
+    updateTable(filteredRecords);
+    updateCharts(filteredRecords);
+    updateFilterOptions(dateFiltered);
+    updateTimestamps();
+  }
+
+  // ========== KPI ==========
+  function updateKPIs(filtered, allDateFiltered) {
+    var quoted = filtered.filter(function(r) { return r.rate !== null; });
+    var notQuoted = filtered.filter(function(r) { return r.rate === null; });
+    var allBanks = new Set(allDateFiltered.map(function(r) { return r.bank; }));
+    var availBanks = new Set(filtered.filter(function(r) { return r.quota !== null && r.quota > 0 && r.quotaType !== 'offline' && r.quotaType !== 'zero'; }).map(function(r) { return r.bank; }));
+
+    if (quoted.length > 0) {
+      var rates = quoted.map(function(r) { return r.rate; });
+      document.getElementById('kpiMinRate').textContent = Math.min.apply(null, rates).toFixed(2) + '%';
+      document.getElementById('kpiMaxRate').textContent = Math.max.apply(null, rates).toFixed(2) + '%';
+      document.getElementById('kpiAvgRate').textContent = (rates.reduce(function(s, v) { return s + v; }, 0) / rates.length).toFixed(2) + '%';
+    } else {
+      document.getElementById('kpiMinRate').textContent = '-';
+      document.getElementById('kpiMaxRate').textContent = '-';
+      document.getElementById('kpiAvgRate').textContent = '-';
+    }
+    document.getElementById('kpiBankCount').textContent = allBanks.size;
+    document.getElementById('kpiAvailBank').textContent = availBanks.size;
+    document.getElementById('kpiNotQuoted').textContent = notQuoted.length;
+    var now = new Date();
+    document.getElementById('kpiUpdateTime').textContent =
+      now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0') + ' ' +
+      String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+  }
+
+  // ========== 表格 ==========
+  function updateTable(records) {
+    var tbody = document.getElementById('tableBody');
+    document.getElementById('tableCount').textContent = '共 ' + records.length + ' 条';
+    if (records.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:32px 0;">暂无匹配数据</td></tr>'; return; }
+
+    // 利率回填：空值继承上一条有效利率或非报价标记文字
+    var displayRates = [];
+    var displayTexts = [];
+    var lastValidRate = null;
+    var lastRateText = null;
+    for (var i = 0; i < records.length; i++) {
+      if (records[i].rateText && records[i].rateText.trim()) {
+        lastRateText = records[i].rateText;
+      } else if (records[i].rate !== null) {
+        lastValidRate = records[i].rate;
+        lastRateText = null;
+      }
+      displayRates.push(lastValidRate);
+      displayTexts.push(lastRateText);
+    }
+
+    tbody.innerHTML = records.map(function(r, idx) {
+      var rateClass = 'rate-none', rateDisplay = '-';
+      // 优先显示当前行或继承的非报价标记文字
+      if (r.rateText && r.rateText.trim()) {
+        rateDisplay = r.rateText;
+      } else if (displayTexts[idx]) {
+        rateDisplay = displayTexts[idx];
+      } else {
+        var effectiveRate = displayRates[idx];
+        if (effectiveRate !== null) {
+          rateDisplay = effectiveRate.toFixed(2);
+          if (effectiveRate <= 0.5) rateClass = 'rate-low';
+          else if (effectiveRate > 10) rateClass = 'rate-abnormal';
+          else rateClass = 'rate-high';
+        }
+      }
+      var quotaDisplay = fmtQuota(r.quota, r.quotaType);
+      var quotaClass = (r.quota !== null && r.quota >= 10000 && r.quotaType === '') ? 'quota-high' : '';
+      var remark = r.remark || '-';
+      return '<tr>' +
+        '<td class="font-number" style="white-space:nowrap">' + esc(r.time || (r.date ? makeDisplayTime(r.date, 0) : '-')) + '</td>' +
+        '<td>' + esc(r.region) + '</td>' +
+        '<td>' + esc(r.bank) + '</td>' +
+        '<td style="text-align:right" class="font-number ' + rateClass + '">' + rateDisplay + '</td>' +
+        '<td style="text-align:right" class="font-number ' + quotaClass + '">' + quotaDisplay + '</td>' +
+        '<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escAttr(r.remark || '') + '">' + esc(remark) + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ========== 筛选选项更新 ==========
+  function updateFilterOptions(records) {
+    var regions = [], seen = {};
+    records.forEach(function(r) { if (!seen[r.region]) { seen[r.region] = true; regions.push(r.region); } });
+    regions.sort();
+    var sel = document.getElementById('filterRegion');
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">全部地区</option>' + regions.map(function(r) { return '<option value="' + r + '"' + (r === cur ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+  }
+
+  function updateTimestamps() {
+    var now = new Date();
+    var ts = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0') + ' ' +
+      String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('headerTime').textContent = ts;
+    document.getElementById('footerTime').textContent = '数据更新：' + ts;
+  }
+
+  // ========== ECharts 通用配置 ==========
+  function getCommonDataZoom() {
+    return [
+      {
+        type: 'slider',
+        orient: 'horizontal',
+        xAxisIndex: 0,
+        bottom: 12,
+        height: 14,
+        showDataShadow: false,
+        start: 0,
+        end: 88,
+        handleStyle: { color: '#365b92' }
+      },
+      {
+        type: 'inside',
+        orient: 'horizontal',
+        xAxisIndex: 0,
+        zoomOnMouseWheel: true,
+        moveOnMouseMove: true
+      }
+    ];
+  }
+
+  function getCommonTooltip() {
+    return {
+      trigger: 'axis',
+      confine: true,
+      axisPointer: { type: 'shadow' },
+      backgroundColor: '#fff',
+      borderColor: '#e5e7eb',
+      borderWidth: 1,
+      textStyle: { color: '#1f2937', fontSize: 12 },
+      extraCssText: 'box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px;'
+    };
+  }
+
+  var chart1Instance = null, chart2Instance = null, chart3Instance = null;
+
+  function initCharts() {
+    var d1 = document.getElementById('chart1');
+    var d2 = document.getElementById('chart2');
+    var d3 = document.getElementById('chart3');
+    if (d1 && !chart1Instance) chart1Instance = echarts.init(d1);
+    if (d2 && !chart2Instance) chart2Instance = echarts.init(d2);
+    if (d3 && !chart3Instance) chart3Instance = echarts.init(d3);
+    window.addEventListener('resize', function() {
+      if (chart1Instance) chart1Instance.resize();
+      if (chart2Instance) chart2Instance.resize();
+      if (chart3Instance) chart3Instance.resize();
+    });
+  }
+
+  function updateCharts(records) {
+    if (!chart1Instance) initCharts();
+    if (!chart1Instance) return;
+    var quoted = records.filter(function(r) { return r.rate !== null; });
+    updateChart1(quoted);
+    updateChart2(quoted);
+    updateChart3(quoted);
+  }
+
+  // ===== 图表1：利率分布直方图 =====
+  function updateChart1(quoted) {
+    if (quoted.length === 0) { chart1Instance.clear(); return; }
+    var rates = quoted.map(function(r) { return r.rate; });
+    var minR = Math.floor(Math.min.apply(null, rates) * 100) / 100;
+    var maxR = Math.ceil(Math.max.apply(null, rates) * 100) / 100;
+    var step = Math.max(0.02, Math.ceil((maxR - minR) / 20 * 100) / 100);
+    var buckets = [];
+    for (var b = minR; b < maxR + step/2; b += step) { buckets.push({ lo: b, hi: b + step, count: 0 }); }
+    rates.forEach(function(r) {
+      for (var i = 0; i < buckets.length; i++) { if (r >= buckets[i].lo && r < buckets[i].hi) { buckets[i].count++; break; } if (i === buckets.length - 1) buckets[i].count++; }
+    });
+    var xLabels = buckets.map(function(b) { return b.lo.toFixed(2) + '-' + b.hi.toFixed(2); });
+    var yData = buckets.map(function(b) { return b.count; });
+    var colors = buckets.map(function(b, i) {
+      var t = buckets.length > 1 ? i / (buckets.length - 1) : 0;
+      if (t < 0.33) { var s = t / 0.33; return 'rgb(' + Math.round(22+15*s) + ',' + Math.round(163-64*s) + ',' + Math.round(74+49*s) + ')'; }
+      else if (t < 0.67) { var s2 = (t-0.33)/0.34; return 'rgb(' + Math.round(37+183*s2) + ',' + Math.round(99-61*s2) + ',' + Math.round(123-85*s2) + ')'; }
+      return 'rgb(220,38,38)';
+    });
+    chart1Instance.setOption({
+      tooltip: { trigger: 'axis', confine: true, backgroundColor: '#fff', borderColor: '#e5e7eb', borderWidth: 1, textStyle: { color: '#1f2937', fontSize: 12 }, extraCssText: 'box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px;', formatter: function(params) { var p = Array.isArray(params) ? params[0] : params; return '<b>利率区间</b>：' + p.name + '<br/><b>报价数量</b>：' + (p.value || 0) + ' 条'; } },
+      grid: { left: 48, right: 20, top: 20, bottom: 28 },
+      xAxis: { type: 'category', data: xLabels, axisLabel: { rotate: 30, fontSize: 10, color: '#6b7280' }, axisTick: { alignWithLabel: true } },
+      yAxis: { type: 'value', name: '银行数量', nameTextStyle: { fontSize: 11, color: '#9ca3af' }, axisLabel: { fontSize: 10, color: '#6b7280' }, splitLine: { lineStyle: { color: '#f3f4f6' } } },
+      series: [{ type: 'bar', data: yData, itemStyle: { color: function(p) { return colors[p.dataIndex]; }, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 40 }]
+    }, true);
+  }
+
+  // ===== 图表2：各地区平均利率柱状图（排除"市场"） =====
+  function updateChart2(quoted) {
+    var nonMarket = quoted.filter(function(r) { return r.region !== '市场'; });
+    if (nonMarket.length === 0) { chart2Instance.clear(); return; }
+    var regionMap = {};
+    nonMarket.forEach(function(r) { if (!regionMap[r.region]) regionMap[r.region] = { sum: 0, count: 0 }; regionMap[r.region].sum += r.rate; regionMap[r.region].count++; });
+    var regions = Object.keys(regionMap).sort();
+    var avgRates = regions.map(function(r) { return +(regionMap[r].sum / regionMap[r].count).toFixed(2); });
+    var totalAvg = +(nonMarket.reduce(function(s, r) { return s + r.rate; }, 0) / nonMarket.length).toFixed(2);
+    chart2Instance.setOption({
+      tooltip: { trigger: 'axis', confine: true, backgroundColor: '#fff', borderColor: '#e5e7eb', borderWidth: 1, textStyle: { color: '#1f2937', fontSize: 12 }, extraCssText: 'box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px;', formatter: function(p) { return '<b>地区</b>：' + p.name + '<br/><b>平均贴现利率</b>：' + p.value.toFixed(2) + '%<br/>全市场均值：' + totalAvg.toFixed(2) + '%'; } },
+      grid: { left: 56, right: 24, top: 24, bottom: 32 },
+      xAxis: { type: 'category', data: regions, axisLabel: { rotate: 30, fontSize: 11, color: '#6b7280' } },
+      yAxis: { type: 'value', name: '平均利率(%)', nameTextStyle: { fontSize: 11, color: '#9ca3af' }, axisLabel: { fontSize: 11, color: '#6b7280' }, splitLine: { lineStyle: { color: '#f3f4f6' } } },
+      series: [{
+        type: 'bar', data: avgRates, itemStyle: { color: '#2c4a7c', borderRadius: [3, 3, 0, 0] }, barMaxWidth: 80,
+        markLine: { silent: true, symbol: 'none', lineStyle: { color: '#ea580c', type: 'dashed', width: 1.5 }, label: { fontSize: 10, color: '#ea580c', formatter: '均值 {c}' }, data: [{ yAxis: totalAvg }] }
+      }]
+    }, true);
+  }
+
+  // ===== 图表3：银行利率TOP20条形图 =====
+  function updateChart3(quoted) {
+    if (quoted.length === 0) { chart3Instance.clear(); return; }
+    var bankMap = {};
+    quoted.forEach(function(r) { if (!bankMap[r.bank]) bankMap[r.bank] = { rates: [], region: r.region }; bankMap[r.bank].rates.push(r.rate); });
+    var banks = Object.keys(bankMap).map(function(b) {
+      var avg = bankMap[b].rates.reduce(function(s, v) { return s + v; }, 0) / bankMap[b].rates.length;
+      return { bank: b, avgRate: avg, region: bankMap[b].region };
+    });
+    banks.sort(function(a, b) { return a.avgRate - b.avgRate; });
+    var top20 = banks.slice(0, 20);
+    var yData = top20.map(function(b) { return b.bank + ' (' + b.region + ')'; }).reverse();
+    var xData = top20.map(function(b) { return +b.avgRate.toFixed(2); }).reverse();
+    var colors2 = top20.map(function(b, i) {
+      var t = top20.length > 1 ? i / (top20.length - 1) : 0;
+      if (t < 0.33) { var s = t / 0.33; return 'rgb(' + Math.round(22+15*s) + ',' + Math.round(163-64*s) + ',' + Math.round(74+49*s) + ')'; }
+      else if (t < 0.67) { var s2 = (t-0.33)/0.34; return 'rgb(' + Math.round(37+183*s2) + ',' + Math.round(99-61*s2) + ',' + Math.round(123-85*s2) + ')'; }
+      return 'rgb(220,38,38)';
+    }).reverse();
+    chart3Instance.setOption({
+      tooltip: { trigger: 'item', confine: true, backgroundColor: '#fff', borderColor: '#e5e7eb', borderWidth: 1, textStyle: { color: '#1f2937', fontSize: 12 }, extraCssText: 'box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 4px;', formatter: function(p) { return '<b>银行</b>：' + p.name + '<br/><b>贴现利率</b>：' + p.value.toFixed(2) + ' %'; } },
+      grid: { left: 160, right: 28, top: 20, bottom: 24 },
+      xAxis: { type: 'value', name: '平均利率(%)', nameTextStyle: { fontSize: 11, color: '#9ca3af' }, axisLabel: { fontSize: 10, color: '#6b7280' }, splitLine: { lineStyle: { color: '#f3f4f6' } } },
+      yAxis: { type: 'category', data: yData, axisLabel: { fontSize: 11, color: '#374151', width: 150, overflow: 'truncate' }, inverse: true },
+      series: [{ type: 'bar', data: xData, itemStyle: { color: function(p) { return colors2[p.dataIndex]; }, borderRadius: [0, 3, 3, 0] }, barMaxWidth: 22 }]
+    }, true);
+  }
+
+  // ========== 日历组件 ==========
+  var calLeftYear, calLeftMonth;
+  var pickStart = null, pickEnd = null;
+
+  function renderCalendars() {
+    renderMonth('left', calLeftYear, calLeftMonth);
+    var rightYear = calLeftMonth === 11 ? calLeftYear + 1 : calLeftYear;
+    var rightMonth = calLeftMonth === 11 ? 0 : calLeftMonth + 1;
+    renderMonth('right', rightYear, rightMonth);
+    document.getElementById('leftTitle').textContent = calLeftYear + '年' + (calLeftMonth + 1) + '月';
+    document.getElementById('rightTitle').textContent = rightYear + '年' + (rightMonth + 1) + '月';
+    updateCalendarNav();
+    updateDateStatus();
+  }
+
+  function renderMonth(side, year, month) {
+    var grid = document.getElementById(side + 'Calendar');
+    var weekHeaders = document.getElementById(side + 'WeekHeaders');
+    weekHeaders.innerHTML = ['日','一','二','三','四','五','六'].map(function(d) { return '<div class="calendar-header">' + d + '</div>'; }).join('');
+    var firstDay = new Date(year, month, 1);
+    var lastDay = new Date(year, month + 1, 0);
+    var startDow = firstDay.getDay();
+    var daysInMonth = lastDay.getDate();
+    var prevLastDay = new Date(year, month, 0).getDate();
+    var cells = [];
+    for (var i = startDow - 1; i >= 0; i--) { cells.push({ day: prevLastDay - i, month: month - 1, year: month === 0 ? year - 1 : year, isOther: true }); }
+    for (var d = 1; d <= daysInMonth; d++) { cells.push({ day: d, month: month, year: year, isOther: false }); }
+    var remaining = 42 - cells.length;
+    for (var d2 = 1; d2 <= remaining; d2++) { cells.push({ day: d2, month: month + 1, year: month === 11 ? year + 1 : year, isOther: true }); }
+
+    var minDate = new Date(2018, 0, 1);
+    var maxDate = new Date(2030, 11, 31);
+
+    grid.innerHTML = cells.map(function(c) {
+      var cellDate = new Date(c.year, c.month, c.day);
+      var cls = 'calendar-cell';
+      var disabled = false;
+      if (c.isOther) cls += ' other-month';
+      if (cellDate < minDate || cellDate > maxDate) { cls += ' disabled'; disabled = true; }
+      if (!disabled && pickStart && pickEnd && !sameDay(pickStart, pickEnd)) { if (cellDate > pickStart && cellDate < pickEnd) cls += ' in-range'; }
+      if (!disabled && pickStart && sameDay(cellDate, pickStart)) cls += ' range-start';
+      if (!disabled && pickEnd && sameDay(cellDate, pickEnd)) cls += ' range-end';
+      var dateKey = c.year + '.' + String(c.month+1).padStart(2,'0') + '.' + String(c.day).padStart(2,'0');
+      var onclick = (disabled || c.isOther) ? '' : ' onclick="window._calClick(\'' + dateKey + '\')"';
+      return '<div class="' + cls + '" data-date="' + dateKey + '"' + onclick + '>' + c.day + '</div>';
+    }).join('');
+  }
+
+    // ========== 快捷日期选择 ==========
+  function setQuickDate(type) {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var start = null, end = null;
+
+    switch (type) {
+      case 'today':
+        start = new Date(today);
+        end = new Date(today);
+        break;
+      case '3d':
+        start = new Date(today);
+        start.setDate(today.getDate() - 2);
+        end = new Date(today);
+        break;
+      case '7d':
+        start = new Date(today);
+        start.setDate(today.getDate() - 6);
+        end = new Date(today);
+        break;
+      case '30d':
+        start = new Date(today);
+        start.setDate(today.getDate() - 29);
+        end = new Date(today);
+        break;
+      case 'thisMonth':
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+        end = new Date(today);
+        break;
+      case 'lastMonth':
+        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        end = new Date(today.getFullYear(), today.getMonth(), 0);
+        break;
+      case 'thisQuarter':
+        var q = Math.floor(today.getMonth() / 3);
+        start = new Date(today.getFullYear(), q * 3, 1);
+        end = new Date(today);
+        break;
+      case 'lastQuarter':
+        var q2 = Math.floor(today.getMonth() / 3) - 1;
+        var qYear = today.getFullYear();
+        if (q2 < 0) { q2 = 3; qYear--; }
+        start = new Date(qYear, q2 * 3, 1);
+        end = new Date(qYear, (q2 + 1) * 3, 0);
+        break;
+      case 'thisYear':
+        start = new Date(today.getFullYear(), 0, 1);
+        end = new Date(today);
+        break;
+      case 'lastYear':
+        start = new Date(today.getFullYear() - 1, 0, 1);
+        end = new Date(today.getFullYear() - 1, 11, 31);
+        break;
+      default:
+        return;
+    }
+
+    pickStart = start;
+    pickEnd = end;
+    selectedStartDate = start;
+    selectedEndDate = end;
+
+    // 同步日历到起始月份
+    calLeftYear = start.getFullYear();
+    calLeftMonth = start.getMonth();
+
+    // 高亮当前快捷按钮，清除其他按钮高亮
+    updateQuickBtnActive(type);
+
+    renderCalendars();
+  }
+
+  // 清除所有快捷按钮的选中高亮
+  function clearQuickBtnActive() {
+    var btns = document.querySelectorAll('#quickDateBar .btn-quick');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove('active');
+    }
+  }
+
+  // 根据当前选中的快捷类型高亮对应按钮
+  function updateQuickBtnActive(type) {
+    clearQuickBtnActive();
+    if (!type) return;
+    var btn = document.querySelector('#quickDateBar .btn-quick[data-quick="' + type + '"]');
+    if (btn) btn.classList.add('active');
+  }
+
+  // 重置日期选择
+  function resetDateSelection() {
+    pickStart = null;
+    pickEnd = null;
+    selectedStartDate = null;
+    selectedEndDate = null;
+    clearQuickBtnActive();
+    // 日历切回当前系统年月
+    var today = new Date();
+    calLeftYear = today.getFullYear();
+    calLeftMonth = today.getMonth();
+    renderCalendars();
+  }
+
+
+function updateCalendarNav() {
+    var minY = 2018, maxY = 2030;
+    document.getElementById('btnPrevYear').disabled = (calLeftYear <= minY);
+    document.getElementById('btnPrevMonth').disabled = (calLeftYear <= minY && calLeftMonth <= 0);
+    document.getElementById('btnNextMonth').disabled = (calLeftYear >= maxY && calLeftMonth >= 11);
+    document.getElementById('btnNextYear').disabled = (calLeftYear >= maxY);
+  }
+
+  function updateDateStatus() {
+    var statusEl = document.getElementById('dateStatus');
+    var hintEl = document.getElementById('rangeHint');
+    if (pickStart && pickEnd) {
+      statusEl.textContent = fmtDate(pickStart) + ' ~ ' + fmtDate(pickEnd);
+      hintEl.textContent = '已选择：' + fmtDate(pickStart) + ' ~ ' + fmtDate(pickEnd);
+    } else if (pickStart) {
+      statusEl.textContent = '起始：' + fmtDate(pickStart) + '（请选择结束日期）';
+      hintEl.textContent = '请点击结束日期，或重新点击更早日期重置选择';
+    } else {
+      statusEl.textContent = '请选择起止日期';
+      hintEl.textContent = '点击日期选择起止区间，灰色日期不可选';
+    }
+  }
+
+  window._calClick = function(dateStr) {
+    var d = parseDate(dateStr);
+    if (!pickStart || pickEnd || d < pickStart) { pickStart = d; pickEnd = null; selectedStartDate = d; selectedEndDate = null; }
+    else { pickEnd = d; selectedStartDate = pickStart; selectedEndDate = d; }
+    // 手动点击日历格子 → 清除所有快捷按钮高亮
+    clearQuickBtnActive();
+    renderCalendars();
+  };
+
+  function navigateCalendar(deltaYear, deltaMonth) {
+    var newYear = calLeftYear + deltaYear;
+    var newMonth = calLeftMonth + deltaMonth;
+    while (newMonth < 0) { newMonth += 12; newYear--; }
+    while (newMonth > 11) { newMonth -= 12; newYear++; }
+    if (newYear < 2018) { newYear = 2018; newMonth = 0; }
+    if (newYear > 2030) { newYear = 2030; newMonth = 11; }
+    calLeftYear = newYear;
+    calLeftMonth = newMonth;
+    renderCalendars();
+  }
+
+  function initCalendar() {
+    var today = new Date();
+    calLeftYear = today.getFullYear();
+    calLeftMonth = today.getMonth();
+    document.getElementById('btnPrevYear').addEventListener('click', function() { navigateCalendar(-1, 0); });
+    document.getElementById('btnPrevMonth').addEventListener('click', function() { navigateCalendar(0, -1); });
+    document.getElementById('btnNextMonth').addEventListener('click', function() { navigateCalendar(0, 1); });
+    document.getElementById('btnNextYear').addEventListener('click', function() { navigateCalendar(1, 0); });
+    document.getElementById('btnConfirmDate').addEventListener('click', function() { if (pickStart && pickEnd) { selectedStartDate = pickStart; selectedEndDate = pickEnd; } updateAll(); });
+    // 快捷日期按钮事件
+    var quickBtns = document.querySelectorAll('#quickDateBar .btn-quick');
+    for (var i = 0; i < quickBtns.length; i++) {
+      quickBtns[i].addEventListener('click', function() {
+        setQuickDate(this.getAttribute('data-quick'));
+      });
+    }
+    // 重置日期按钮
+    document.getElementById('btnResetDate').addEventListener('click', function() {
+      resetDateSelection();
+    });
+
+renderCalendars();
+  }
+
+  // ========== 筛选事件绑定 ==========
+  function initFilters() {
+    ['filterRegion','filterRateMin','filterRateMax','filterQuotaMin','filterBankSearch'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.addEventListener('input', function() { updateAll(); }); el.addEventListener('change', function() { updateAll(); }); }
+    });
+    document.getElementById('btnResetFilter').addEventListener('click', function() {
+      document.getElementById('filterRegion').value = '';
+      document.getElementById('filterRateMin').value = '';
+      document.getElementById('filterRateMax').value = '';
+      document.getElementById('filterQuotaMin').value = '';
+      document.getElementById('filterBankSearch').value = '';
+      updateAll();
+    });
+  }
+
+  // ========== 表格排序 ==========
+  function initTableSort() {
+    document.getElementById('dataTable').addEventListener('click', function(e) {
+      var th = e.target.closest('th');
+      if (!th) return;
+      var field = th.getAttribute('data-sort');
+      if (!field || (field !== 'rate' && field !== 'quota' && field !== 'time')) return;
+      if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { sortField = field; sortDir = (field === 'time') ? 'desc' : 'asc'; }
+      var allTh = document.querySelectorAll('#dataTable th');
+      allTh.forEach(function(t) { t.classList.remove('sorted'); });
+      th.classList.add('sorted');
+      updateAll();
+    });
+  }
+
+  // ========== Excel 上传 ==========
+  function initUpload() {
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          var wb = XLSX.read(evt.target.result, { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          var newRecords = parseUploadedData(rows);
+          if (newRecords.length === 0) { alert('未解析到有效数据，请确认文件格式：地区、银行、国股、剩余额度、备注'); return; }
+          allRecords = newRecords;
+          saveDataToLocalStorage();
+          var lastDate = allRecords[allRecords.length - 1].date;
+          selectedStartDate = parseDate(lastDate);
+          selectedEndDate = parseDate(lastDate);
+          pickStart = selectedStartDate;
+          pickEnd = selectedEndDate;
+          calLeftYear = selectedStartDate.getFullYear();
+          calLeftMonth = selectedStartDate.getMonth();
+          renderCalendars();
+          updateAll();
+          alert('成功导入 ' + newRecords.length + ' 条报价记录。\n\n点击「下载更新后看板」可保存为新的HTML文件，用于上传钉钉。');
+        } catch(err) { alert('文件解析失败：' + err.message); }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // ========== Excel 导出 ==========
+  function initExport() {
+    document.getElementById('btnExport').addEventListener('click', function() {
+      var exportData = [['地区', '银行', '国股贴现利率(%)', '剩余额度', '备注']];
+      filteredRecords.forEach(function(r) { exportData.push([r.region, r.bank, r.rate !== null ? r.rate.toFixed(2) : '暂未报价', fmtQuota(r.quota, r.quotaType), r.remark || '']); });
+      var ws = XLSX.utils.aoa_to_sheet(exportData);
+      ws['!cols'] = [{wch:8}, {wch:22}, {wch:16}, {wch:14}, {wch:40}];
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '贴现报价');
+      XLSX.writeFile(wb, '票据贴现报价_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    });
+  }
+
+  // ========== 下载更新后的完整看板 ==========
+  function initDownloadHtml() {
+    document.getElementById('btnDownloadHtml').addEventListener('click', function() {
+      // 1. 序列化当前数据为紧凑格式
+      var compactData = allRecords.map(function(r) {
+        return JSON.stringify([r.date, r.region, r.bank, r.rate, r.quota, r.quotaType || '', r.remark || '', r.rateText || '']);
+      }).join(',');
+
+      // 2. 获取完整 HTML（包含 DOCTYPE）
+      var fullHTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+      // 3. 替换 script src=data.js 为内联数据
+      var srcTag = '<scr' + 'ipt src="data.js"></scr' + 'ipt>';
+      var inlineData = '<scr' + 'ipt>\nconst EMBEDDED_DATA = [' + compactData + '];\n</scr' + 'ipt>';
+      var newHTML = fullHTML.replace(srcTag, inlineData);
+
+      if (newHTML === fullHTML) {
+        // 降级方案：尝试替换标记（兼容旧版桌面文件）
+        var startMarker = '<!--EMBEDDED_DATA_START-->';
+        var endMarker = '<!--EMBEDDED_DATA_END-->';
+        var startIdx = fullHTML.indexOf(startMarker);
+        var endIdx = fullHTML.indexOf(endMarker);
+        if (startIdx !== -1 && endIdx !== -1) {
+          var before = fullHTML.substring(0, startIdx + startMarker.length);
+          var after = fullHTML.substring(endIdx);
+          var newDataSection = '\n<scr' + 'ipt>\nconst EMBEDDED_DATA = [' + compactData + '];\n</scr' + 'ipt>\n';
+          newHTML = before + newDataSection + after;
+        } else {
+          alert('下载失败：无法定位数据区域。请确保使用完整的看板文件。');
+          return;
+        }
+      }
+
+      // 4. 触发下载
+      var blob = new Blob([newHTML], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      var now = new Date();
+      var ts = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      a.download = '金融部门票据贴现利率看板_' + ts + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('看板已下载！包含 ' + allRecords.length + ' 条最新报价数据，可直接上传到钉钉或重新部署到 Vercel。');
+    });
+  }
+
+  // ========== 图表 resize 监听 ==========
+  function initResizeObserver() {
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function() {
+        if (chart1Instance) chart1Instance.resize();
+        if (chart2Instance) chart2Instance.resize();
+        if (chart3Instance) chart3Instance.resize();
+      });
+      var chartRow1 = document.querySelector('.charts-row-1');
+      var chartRow2 = document.querySelector('.charts-row-2');
+      if (chartRow1) ro.observe(chartRow1);
+      if (chartRow2) ro.observe(chartRow2);
+    }
+  }
+
+  //   // 清除缓存按钮事件
+  document.getElementById('btnClearCache').addEventListener('click', function() {
+    if (confirm('确定要清除本地缓存数据吗？\n\n清除后将恢复为看板内置的原始数据。')) {
+      clearLocalData();
+    }
+  });
+
+  // ========== 启动 ==========
+  function init() {
+    loadEmbeddedData();
+    initCalendar();
+    initFilters();
+    initTableSort();
+    initUpload();
+    initExport();
+    initDownloadHtml();
+    initCharts();
+    initResizeObserver();
+    updateAll();
+  }
+
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  else { init(); }
+})();
+</script>
+
+<!--
+========================================
+  金融部门票据贴现利率看板 v1.0
+  使用说明：
+  1. 双击本文件在浏览器中打开
+  2. 顶部双月日历：点击日期选择起止区间，点击"确定"刷新全看板
+  3. 筛选面板：按地区/利率范围/最低额度/银行名称关键词筛选
+  4. 表格：点击"国股贴现利率"或"剩余额度"列表头排序
+  5. 底部"上传Excel报价文件"：上传新的.xls/.xlsx数据文件替换数据源
+  6. 底部"导出筛选结果Excel"：将当前筛选后的数据导出为Excel文件
+  7. 三张图表：底部横向滑块+鼠标滚轮缩放+按住拖拽平移
+
+  嵌入数据：2829条报价记录，2025.02 - 2026.08，267个交易日
+  数据源：桌面的票据报价.xls
+  技术栈：Tailwind CSS v3 + ECharts v5 + SheetJS + 原生JavaScript
+========================================
+-->
+</body>
+</html>
